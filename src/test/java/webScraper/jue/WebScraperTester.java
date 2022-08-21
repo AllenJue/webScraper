@@ -6,6 +6,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
 import java.io.IOException;
 
 public class WebScraperTester {
@@ -43,6 +44,21 @@ public class WebScraperTester {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
     }
+
+    @Test
+    public void webScraperCreatesCSVDirectory() {
+        WebScraper ws = new WebScraper();
+        File shareDataDirectory = new File(ws.getDataPath());
+        Assertions.assertTrue(shareDataDirectory.isDirectory());
+    }
+
+    @Test
+    public void webScraperCreatesCSVFileWithCorrectDate() {
+        WebScraper ws = new WebScraper();
+        File fileWithDateAndCSV = new File(ws.getDataPath() + File.separator + ws.getDate() + ".csv");
+        Assertions.assertTrue(fileWithDateAndCSV.exists() && !fileWithDateAndCSV.isDirectory());
+    }
+
+
 }

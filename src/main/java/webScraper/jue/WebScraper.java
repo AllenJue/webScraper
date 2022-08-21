@@ -14,69 +14,129 @@ import com.gargoylesoftware.htmlunit.html.HtmlElement;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.opencsv.CSVWriter;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
 import java.util.List;
 
 public class WebScraper {
+    private WebClient webClient;
+    private String date;
 
-    public static void main(String[] args) {
-        WebClient webClient = new WebClient(BrowserVersion.CHROME);
+    /**
+     * Constructor for a WebScraper class that gathers the share info
+     * for the Fortune 500 and generates a CSV file with the share data
+     */
+    public WebScraper() {
+        webClient = new WebClient(BrowserVersion.CHROME);
+        setWebClientPreferences();
+        try {
+            HtmlPage page = webClient.getPage("https://markets.businessinsider.com/index/components/s&p_500?p=1");
+            setDate(page);
+            // create a file in user home documents directory
+            createDir();
+            File CSVFile = new File(getDataPath() + File.separator + getDate() + ".csv");
+            if(CSVFile.exists()) {
+                System.out.println("File already exists. Nothing written");
+            } else {
+                createCSVFile(page, CSVFile);
+            }
+            webClient.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Generates a CSV File from a page of share data
+     *
+     * @param page of share information
+     * @param CSVFile CSVFile to write to
+     */
+    private void createCSVFile(HtmlPage page, File CSVFile) {
+        try {
+            List<HtmlElement> anchors = new ArrayList<>();
+            // get first 10 pages
+            populateAnchors(anchors, page);
+            CSVWriter fileWriter = new CSVWriter(new FileWriter(CSVFile));
+            // for the first 10 anchors, open the page and collect data from those pages
+            for(HtmlElement element : anchors) {
+                HtmlPage newWindow = (HtmlPage) (((HtmlAnchor) element).openLinkInNewWindow());
+                List<HtmlElement> tableRows = newWindow.getByXPath(".//tbody//tr");
+                for(HtmlElement tr : tableRows) {
+                    Share share = processTr(tr);
+                    if(share != null) {
+                        fileWriter.writeNext(share.csvFormat().split(","));
+                    }
+                }
+                newWindow.cleanUp();
+            }
+            fileWriter.close();
+            System.out.println("Successfully Written");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Disables CSS, JavaScript, and utilizes InsecureSSL for a WebClient
+     * in order to successfully gather information. Exceptions hidden to
+     * make output more visible
+     */
+    private void setWebClientPreferences() {
         webClient.getOptions().setJavaScriptEnabled(false);
         webClient.getOptions().setCssEnabled(false);
         webClient.getOptions().setUseInsecureSSL(true);
         webClient.getOptions().setThrowExceptionOnFailingStatusCode(false);
         webClient.getOptions().setThrowExceptionOnScriptError(false);
         webClient.getOptions().setPrintContentOnFailingStatusCode(false);
-        try {
-            HtmlPage page = webClient.getPage("https://markets.businessinsider.com/index/components/s&p_500?p=1");
-            List<HtmlElement> anchors = new ArrayList<>();
-
-            // get date
-            String fileName = getDate(page) + ".csv";
-
-            try {
-                // get first 10 pages
-                populateAnchors(anchors, page);
-                CSVWriter fileWriter = new CSVWriter(new FileWriter(fileName, true));
-                // for the first 10 anchors, open the page and collect data from those pages
-                for(HtmlElement element : anchors) {
-                    HtmlAnchor anchor = (HtmlAnchor) element;
-                    HtmlPage newWindow = (HtmlPage) anchor.openLinkInNewWindow();
-                    List<HtmlElement> tableRows = newWindow.getByXPath(".//tbody//tr");
-                    List<Share> shares = new ArrayList<>();
-                    for(HtmlElement tr : tableRows) {
-                        Share share = processTr(tr);
-                        if(share != null) {
-                            shares.add(share);
-                            fileWriter.writeNext(share.csvFormat().split(","));
-                        }
-                    }
-                    // System.out.println(shares);
-                    newWindow.cleanUp();
-                }
-                fileWriter.close();
-            } catch (FileAlreadyExistsException e) {
-                System.err.println("already exists: " + e.getMessage());
-            }
-            webClient.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
     }
 
     /**
-     * Gets the date retrieved from the page. Will be used at the CSV file name
+     * Create a directory called with the path /User/Documents/Share_Data
+     * if it doesn't already exist
+     */
+    private void createDir() {
+        String path = getDataPath();
+        File directory = new File(path);
+        if(directory.exists()) {
+            System.out.println(directory + " exists already.");
+        } else if(directory.mkdir()) {
+            System.out.println(directory + " has just been created.");
+        } else {
+            System.out.println(directory + " could not be generated.");
+        }
+    }
+
+    /**
+     * Gets the path from the users home directory to Share_Data
+     *
+     * @return the concatenated path of User/Documents/Share_Data
+     */
+    public String getDataPath() {
+        return System.getProperty("user.home") + File.separator + "Documents"
+                + File.separator + "Share_Data";
+    }
+
+    /**
+     * Gets the date that the CSV file was created
+     *
+     * @return this.date
+     */
+    public String getDate() {
+        return date;
+    }
+
+    /**
+     * Sets the date retrieved from the page. Will be used at the CSV file name
      *
      * @param page from stock market web page to have date retrieved from
      * @return date of stock market data retrieval
      */
-    private static String getDate(HtmlPage page) {
+    private void setDate(HtmlPage page) {
         List<HtmlElement> elements = page.getByXPath("/html/body/main/div/div[3]/div[1]/div[4]/table/tbody/tr[1]/td[5]/text()");
-        return elements.get(1) + "";
+        date = elements.get(1) + "";
     }
 
     /**
@@ -85,7 +145,7 @@ public class WebScraper {
      * @param tr row that data is extracted from
      * @return a Share object containing the name, the latest price, percent change over: day, 1 month, 6 months, and 1 year
      */
-    private static Share processTr(HtmlElement tr) {
+    private Share processTr(HtmlElement tr) {
         List<HtmlElement> elements = tr.getByXPath(".//td");
         String name = ((HtmlAnchor) elements.get(0).getFirstByXPath(".//a")).getTextContent();
         if(name.length() == 0) {
@@ -111,7 +171,7 @@ public class WebScraper {
      * @param needsFormatting needs formatting if data has a comma (deletes comma to allow for parsing)
      * @return the double value of a table entry
      */
-    private static double parseTableData(HtmlElement tableData, boolean needsFormatting) {
+    private double parseTableData(HtmlElement tableData, boolean needsFormatting) {
         String formatted;
         if(needsFormatting) {
             formatted = tableData.getFirstChild().getTextContent();
@@ -129,7 +189,7 @@ public class WebScraper {
      * @param anchors to other pages from the current page
      * @param page starting page
      */
-    private static void populateAnchors(List<HtmlElement> anchors, HtmlPage page) {
+    private void populateAnchors(List<HtmlElement> anchors, HtmlPage page) {
         // gets first 10 pages of market shares
         final int NUM_PAGES = 10;
         for(int i = 1; i <= NUM_PAGES; i++) {
