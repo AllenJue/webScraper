@@ -48,6 +48,11 @@ public class Share implements Comparable<Share> {
             + " | change 1 Y: " + change_1Year;
     }
 
+    public String csvFormat() {
+        return getName() + "," + getLatestPrice() + "," + getChange()
+                + "," + getChange_3Months() + "," + getChange_6Months()
+                + "," + getChange_1Year();
+    }
     /**
      * Gets the name of the Share
      *

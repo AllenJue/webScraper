@@ -12,8 +12,11 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlElement;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.opencsv.CSVWriter;
 
+import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,29 +34,49 @@ public class WebScraper {
             HtmlPage page = webClient.getPage("https://markets.businessinsider.com/index/components/s&p_500?p=1");
             List<HtmlElement> anchors = new ArrayList<>();
 
-            // get first 10 pages
-            populateAnchors(anchors, page);
+            // get date
+            String fileName = getDate(page) + ".csv";
 
-            // for the first 10 anchors, open the page and collect data from those pages
-            for(HtmlElement element : anchors) {
-                HtmlAnchor anchor = (HtmlAnchor) element;
-                HtmlPage newWindow = (HtmlPage) anchor.openLinkInNewWindow();
-                List<HtmlElement> tableRows = newWindow.getByXPath(".//tbody//tr");
-                List<Share> shares = new ArrayList<>();
-                for(HtmlElement tr : tableRows) {
-                    Share share = processTr(tr);
-                    if(share != null) {
-                        shares.add(share);
+            try {
+                // get first 10 pages
+                populateAnchors(anchors, page);
+                CSVWriter fileWriter = new CSVWriter(new FileWriter(fileName, true));
+                // for the first 10 anchors, open the page and collect data from those pages
+                for(HtmlElement element : anchors) {
+                    HtmlAnchor anchor = (HtmlAnchor) element;
+                    HtmlPage newWindow = (HtmlPage) anchor.openLinkInNewWindow();
+                    List<HtmlElement> tableRows = newWindow.getByXPath(".//tbody//tr");
+                    List<Share> shares = new ArrayList<>();
+                    for(HtmlElement tr : tableRows) {
+                        Share share = processTr(tr);
+                        if(share != null) {
+                            shares.add(share);
+                            fileWriter.writeNext(share.csvFormat().split(","));
+                        }
                     }
+                    // System.out.println(shares);
+                    newWindow.cleanUp();
                 }
-                System.out.println(shares);
-                newWindow.cleanUp();
+                fileWriter.close();
+            } catch (FileAlreadyExistsException e) {
+                System.err.println("already exists: " + e.getMessage());
             }
             webClient.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
 
+    }
+
+    /**
+     * Gets the date retrieved from the page. Will be used at the CSV file name
+     *
+     * @param page from stock market web page to have date retrieved from
+     * @return date of stock market data retrieval
+     */
+    private static String getDate(HtmlPage page) {
+        List<HtmlElement> elements = page.getByXPath("/html/body/main/div/div[3]/div[1]/div[4]/table/tbody/tr[1]/td[5]/text()");
+        return elements.get(1) + "";
     }
 
     /**
