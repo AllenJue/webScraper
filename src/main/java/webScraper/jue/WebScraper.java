@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class WebScraper {
-    private WebClient webClient;
+    private final WebClient webClient;
     private String date;
 
     /**
@@ -132,7 +132,6 @@ public class WebScraper {
      * Sets the date retrieved from the page. Will be used at the CSV file name
      *
      * @param page from stock market web page to have date retrieved from
-     * @return date of stock market data retrieval
      */
     private void setDate(HtmlPage page) {
         List<HtmlElement> elements = page.getByXPath("/html/body/main/div/div[3]/div[1]/div[4]/table/tbody/tr[1]/td[5]/text()");
