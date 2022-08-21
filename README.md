@@ -9,8 +9,8 @@ The webScraper is currently a precursor to machine learning models that learn fr
 Csv files will not be recreated if they already exist, and the files are stored in the users //User/Documents/Shared_Data directory.
 
 ## Technologies
-Java 8 or higher
-HTMLUnit
-OpenCSV
-JUnit
+* Java 8 or higher
+* HTMLUnit
+* OpenCSV
+* JUnit
 
